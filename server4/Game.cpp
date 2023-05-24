@@ -23,7 +23,7 @@ int Game::addPlayer(User& user) {
 		Logger::logGame("Игра уже началась, нельзя добавлять игроков");
 		return -1;
 	}
-
+	std::lock_guard<std::mutex> guard(myMutex);
 	if (players.size() > MAX_PLAYERS) {
 		Logger::logGame("Достигнуто максимальное количество игроков");
 		return -2;
@@ -43,6 +43,7 @@ int Game::removePlayer(User& user) {
 	if (gameState == IN_PROGRESS) {
 		endGame();
 	}
+	std::lock_guard<std::mutex> guard(myMutex);
 	for (auto it = players.begin(); it != players.end(); ++it) {
 		if (it->GetConnection() == user.GetConnection()) {
 			Logger::logGame("Игрок " + to_string(user.GetConnection()) + " удален из игры №" + to_string(game_id));
@@ -59,6 +60,7 @@ int Game::removePlayer(User& user) {
 
 int Game::startGame() {
 
+	std::lock_guard<std::mutex> guard(myMutex);
 	if (players.size() == MAX_PLAYERS && gameState == IN_PROGRESS) {
 		return 0;
 	}
@@ -70,7 +72,6 @@ int Game::endGame() {
 	deck.clear();
 	game_end = 0;
 	Logger::logGame("Игра окончена");
-	gameState = PRE_GAME;
 	return 0;
 }
 
@@ -84,7 +85,7 @@ int Game::getCountMaxPlayers()
 
 string Game::GiveCard(User& user)
 {
-	if (user.GetCardsSum() > 21) return "-1";
+	if (user.GetCardsSum() >= 21) return "-1";
 	auto next = GenerateCard();
 	user.AddCard(next);
 	return to_string(next.value) + "|" + next.suit;
@@ -93,6 +94,11 @@ string Game::GiveCard(User& user)
 int Game::PlayerEndGame(User& user)
 {
 	game_end++;
+	std::lock_guard<std::mutex> guard(myMutex);
+	if (game_end == players.size())
+	{
+		endGame();
+	}
 	user.EndGame();
 	return 0;
 }
@@ -100,17 +106,18 @@ int Game::PlayerEndGame(User& user)
 
 int Game::getCurrentCountPlayers()
 {
+	std::lock_guard<std::mutex> guard(myMutex);
 	return players.size();
 }
 
 string Game::CheckWin(User& user)
 {
 	int current_sum = user.GetCardsSum();
-	if (game_end != players.size()) return "-1";
-	endGame();
+	if (gameState != GAME_OVER) return "-1";
+	std::lock_guard<std::mutex> guard(myMutex);
 	if (current_sum > 21)
 	{
-		for (auto it = players.begin(); it != players.end(); ++it) {
+		for (auto it = players.begin(); it != players.end(); it++) {
 			if (it->GetConnection() == user.GetConnection()) continue;
 			int sum = it->GetCardsSum();
 			if (sum < current_sum) return "lose";
@@ -118,13 +125,14 @@ string Game::CheckWin(User& user)
 		return "win";
 	}
 	else {
-		for (auto it = players.begin(); it != players.end(); ++it) {
+		for (auto it = players.begin(); it != players.end(); it++) {
 			if (it->GetConnection() == user.GetConnection()) continue;
 			int sum = it->GetCardsSum();
 			if (sum > current_sum && sum < 22) return "lose";
 		}
 		return "win";
 	}
+	gameState = PRE_GAME;
 }
 
 Card Game::GenerateCard() {

@@ -1,5 +1,7 @@
 #include "Game.h"
 
+std::mutex mutex_user;
+
 User::User(Game& gameSession, SOCKET& connection)
 {
 	this->connection = connection;
@@ -28,6 +30,7 @@ void User::EndGame()
 
 int User::GetCardsSum()
 {
+	std::lock_guard<std::mutex> guard(mutex_user);
 	int sum = 0;
 	for (Card card : Cards) {
 		sum += card.value;
@@ -44,13 +47,9 @@ void User::Disconnect()
 
 int User::AddCard(Card card)
 {
+	//std::lock_guard<std::mutex> guard(mutex_user);
 	Cards.push_back(card);
-	// Подсчет суммы значений карт
-	int sum = 0;
-	for (Card card : Cards) {
-		sum += card.value;
-	}
-	return sum;
+	return GetCardsSum();
 }
 
 void User::PlayerHandler()

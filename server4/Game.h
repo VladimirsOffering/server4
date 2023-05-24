@@ -32,7 +32,6 @@ private:
 	thread* ClientThread;
 	vector<Card> Cards;
 	volatile bool EndStatus;
-
 public:
 
 	User(Game& gameSession, SOCKET& connection);
@@ -71,6 +70,7 @@ private:
 	static int count;
 	int game_id;
 	GameState gameState;
+	std::mutex myMutex;
 
 public:
 	Game();
